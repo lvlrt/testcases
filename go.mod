@@ -1,1 +1,1 @@
-module testcases
+module github.com/lvlrt/testcases
