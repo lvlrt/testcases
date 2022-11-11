@@ -1,3 +1,3 @@
-module github.com/lvlrt/testcases
+module testcases
 
 go 1.19
