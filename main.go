@@ -5,16 +5,17 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
+	"path"
 	"regexp"
 )
 
 func main() {
 	err, flags := parseFlags()
 	if err != nil {
+		printUsage()
+		fmt.Println("")
 		fmt.Println(err.Error())
-		flag.Usage()
 		os.Exit(1)
 	}
 
@@ -24,7 +25,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	printTestCases(testcases)
+	err, specificationMap, untaggedSpecifications := createSpecificationMap(testcases)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+
+	printSpecificationMap(specificationMap, untaggedSpecifications)
+
+	if *flags.Store {
+		println(fmt.Sprintf("Storing specification map in %v", *flags.SpecificationsMapOutput))
+		err = storeSpecificationMap(*flags.SpecificationsMapOutput, specificationMap, untaggedSpecifications)
+		if err != nil {
+			fmt.Println(err.Error())
+			os.Exit(1)
+		}
+	}
 }
 
 type Specification struct {
@@ -32,23 +48,21 @@ type Specification struct {
 	File        string
 }
 
-func printTestCases(testcases []TestCase) error {
-	tagMap := make(map[string][]Specification)
+func createSpecificationMap(testcases []TestCase) (error, map[string][]Specification, []Specification) {
+	specificationMap := make(map[string][]Specification)
 	var untagged []Specification
 
 	for _, testcase := range testcases {
 		tagRegexes := []string{`(\S+):`}
 		r, err := regexp.Compile(fmt.Sprintf("%v", tagRegexes[0]))
 		if err != nil {
-			return err
+			return err, specificationMap, untagged
 		}
-
-		log.Println(testcase.Description)
 
 		specRegex := `[^:]\s*([^:]*)$`
 		s, err := regexp.Compile(specRegex)
 		if err != nil {
-			return err
+			return err, specificationMap, untagged
 		}
 		spec := Specification{Description: s.FindStringSubmatch(string(testcase.Description))[1], File: testcase.File}
 
@@ -57,16 +71,36 @@ func printTestCases(testcases []TestCase) error {
 			constainsTag = true
 			tag := t[1]
 
-			tagMap[tag] = append(tagMap[tag], spec)
+			specificationMap[tag] = append(specificationMap[tag], spec)
 		}
 
 		if !constainsTag {
 			untagged = append(untagged, spec)
 		}
 	}
+	return nil, specificationMap, untagged
+}
 
-	for tag, specs := range tagMap {
-		printSpecs(tag, specs)
+func storeSpecificationMap(filepath string, specificationMap map[string][]Specification, untagged []Specification) error {
+	err := os.MkdirAll(path.Dir(filepath), 0700)
+	if err != nil {
+		return err
+	}
+
+	for req, specs := range specificationMap {
+		//TODO save as MD
+		println(req)
+		println(specs)
+	}
+
+	println(untagged)
+
+	return nil
+}
+
+func printSpecificationMap(specificationMap map[string][]Specification, untagged []Specification) error {
+	for req, specs := range specificationMap {
+		printSpecs(req, specs)
 	}
 
 	printSpecs("(untagged)", untagged)
@@ -119,14 +153,28 @@ func parseTestFiles(testfiles []string) (error, []TestCase) {
 	return nil, testcases
 }
 
+func printUsage() {
+	fmt.Printf("Usage: %s [OPTIONS] testfile1 testfile2 ...\n", path.Base(os.Args[0]))
+	flag.PrintDefaults()
+}
+
 type Flags struct {
-	TestFiles []string
-	Output    *string
+	Store                   *bool
+	TestFiles               []string
+	RequirementsFile        *string
+	SpecificationsMapOutput *string
+	RisksFile               *string
+	RiskTableOutput         *string
+	Output                  *string
 }
 
 func parseFlags() (error, Flags) {
 	var flags Flags
-	//flags.example = flag.String("example", "", "description")
+	flags.RequirementsFile = flag.String("reqs", "", "Path to file with requirements")
+	flags.RisksFile = flag.String("risks", "", "Path to file with risks")
+	flags.SpecificationsMapOutput = flag.String("spec-map", "docs/specifications-map.md", "Filepath for output of specification map")
+	flags.RisksFile = flag.String("risks-table", "docs/risks-table.md", "Filepath for output of risks map")
+	flags.Store = flag.Bool("store", false, "Wether to store the output to disk")
 
 	flag.Parse()
 	flags.TestFiles = flag.Args()
