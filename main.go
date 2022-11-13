@@ -267,7 +267,7 @@ func parseTestFiles(testfiles []string) (error, []TestCase) {
 }
 
 func printUsage() {
-	fmt.Printf("Usage: %s [OPTIONS] testfile1 testfile2 ...\n", path.Base(os.Args[0]))
+	fmt.Printf("Usage: %s [OPTIONS] testfile1 testfile3 ...\n", path.Base(os.Args[0]))
 	flag.PrintDefaults()
 }
 
